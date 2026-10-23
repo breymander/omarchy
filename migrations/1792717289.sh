@@ -65,15 +65,20 @@ while IFS= read -r menu_cmdline; do
   carries_param "${menu_cmdline#*cmdline:}" && built=1
 done <<<"$menu_cmdlines"
 
-if ((!built)) && omarchy-cmd-present limine-entry-tool; then
+# --get-cmdline reads the configuration, not the built menu: it tells a failed
+# rebuild from a config that leaves the parameter out, which no rebuild changes.
+if [[ -n $menu_cmdlines ]] && ((!built)); then
+  configured=0
   for entry in linux-omarchy linux-omarchy-fallback; do
     kernel_cmdline=$(sudo limine-entry-tool --get-cmdline "$entry" 2>/dev/null | tail -n 1) || continue
-    carries_param "$kernel_cmdline" && built=1
+    carries_param "$kernel_cmdline" && configured=1
   done
-fi
 
-if ((!built)); then
-  echo "The boot image still has no entry with $param after the rebuild" >&2
-  exit 1
+  if ((configured)); then
+    echo "The boot image still has no entry with $param after the rebuild" >&2
+    exit 1
+  fi
+
+  echo "The Limine kernel command line leaves out $param; use += rather than = in /etc/default/limine to keep it"
 fi
 sudo install -Dm644 /dev/null "$rebuild_marker"
