@@ -22,7 +22,57 @@ if [[ -f $boot_order ]] && ! grep -Fq 'acpi_osi=\"!Windows 2022\"' "$boot_order"
 fi
 
 # Machine-wide rebuild. Another user's run must not repeat it; a missing
-# marker still retries an interrupted rebuild.
+# marker still retries an interrupted rebuild. limine-mkinitcpio can skip a
+# kernel it could not build and still exit 0, so the marker is written only
+# after a boot entry actually carries the parameter.
 [[ ! -e $rebuild_marker ]] || exit 0
-sudo limine-mkinitcpio
+sudo limine-mkinitcpio || exit 1
+
+param='acpi_osi=!Windows 2022'
+carries_param() {
+  local cmdline=$1 word="" last="" quote="" char i
+  for ((i = 0; i < ${#cmdline}; i++)); do
+    char=${cmdline:i:1}
+    if [[ -z $quote && ($char == '"' || $char == "'") ]]; then
+      quote=$char
+    elif [[ $char == "$quote" ]]; then
+      quote=""
+    elif [[ -z $quote && $' \t\n\r' == *"$char"* ]]; then
+      [[ $word != "${param%%=*}="* ]] || last=$word
+      word=""
+    else
+      word+=$char
+    fi
+  done
+  [[ $word != "${param%%=*}="* ]] || last=$word
+  [[ $last == "$param" ]]
+}
+
+limine_conf="${OMARCHY_LIMINE_CONF:-}"
+if [[ -z $limine_conf ]]; then
+  esp=""
+  if [[ -r /etc/default/limine ]]; then
+    esp=$(sed -n 's/^ESP_PATH=["'\'']\?\([^"'\'']*\).*/\1/p' /etc/default/limine | tail -n 1)
+  fi
+  limine_conf="${esp:-/boot}/limine.conf"
+fi
+
+built=0
+menu_cmdlines=$(sudo grep -E '^[[:space:]]*cmdline:' "$limine_conf" 2>/dev/null) || menu_cmdlines=""
+while IFS= read -r menu_cmdline; do
+  [[ -n $menu_cmdline ]] || continue
+  carries_param "${menu_cmdline#*cmdline:}" && built=1
+done <<<"$menu_cmdlines"
+
+if ((!built)) && omarchy-cmd-present limine-entry-tool; then
+  for entry in linux-omarchy linux-omarchy-fallback; do
+    kernel_cmdline=$(sudo limine-entry-tool --get-cmdline "$entry" 2>/dev/null | tail -n 1) || continue
+    carries_param "$kernel_cmdline" && built=1
+  done
+fi
+
+if ((!built)); then
+  echo "The boot image still has no entry with $param after the rebuild" >&2
+  exit 1
+fi
 sudo install -Dm644 /dev/null "$rebuild_marker"
