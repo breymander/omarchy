@@ -91,9 +91,9 @@ osi_param() {
     char=${cmdline:i:1}
     if [[ -z $quote && ($char == '"' || $char == "'") ]]; then
       quote=$char
-    elif [[ $char == "$quote" ]]; then
+    elif [[ $char == $quote ]]; then
       quote=""
-    elif [[ -z $quote && $' \t\n\r' == *"$char"* ]]; then
+    elif [[ -z $quote && $' \t\n\r' == *$char* ]]; then
       [[ $word == acpi_osi=* ]] && found=$word
       word=""
     else

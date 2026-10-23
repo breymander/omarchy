@@ -35,17 +35,17 @@ carries_param() {
     char=${cmdline:i:1}
     if [[ -z $quote && ($char == '"' || $char == "'") ]]; then
       quote=$char
-    elif [[ $char == "$quote" ]]; then
+    elif [[ $char == $quote ]]; then
       quote=""
-    elif [[ -z $quote && $' \t\n\r' == *"$char"* ]]; then
-      [[ $word != "${param%%=*}="* ]] || last=$word
+    elif [[ -z $quote && $' \t\n\r' == *$char* ]]; then
+      [[ $word != ${param%%=*}=* ]] || last=$word
       word=""
     else
       word+=$char
     fi
   done
-  [[ $word != "${param%%=*}="* ]] || last=$word
-  [[ $last == "$param" ]]
+  [[ $word != ${param%%=*}=* ]] || last=$word
+  [[ $last == $param ]]
 }
 
 limine_conf="${OMARCHY_LIMINE_CONF:-}"
