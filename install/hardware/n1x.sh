@@ -50,13 +50,15 @@ CONF
 # claim so SSPM enumerates and the keyboard works from the LUKS prompt.
 # Verified on BIOS TUCN26WW: with the claim removed, SSPM_CI binds and
 # LENC0001:00 048D:83DB appears as a console keyboard.
-lenovo_osi=""
+lenovo_n1x=0
 if omarchy-hw-match "15N1X11" || omarchy-hw-match "83SS"; then
-  lenovo_osi=" acpi_osi=!Windows 2022"
+  lenovo_n1x=1
   cat > /etc/limine-entry-tool.d/00-omarchy-n1x-lenovo-osi.conf <<'CONF'
 # Lenovo N1x: firmware hides SSPM from an OS that claims Windows 2022, which
-# leaves the I2C keyboard unpowered. See install/hardware/n1x.sh.
-KERNEL_CMDLINE[default]+=" acpi_osi=!Windows 2022"
+# leaves the I2C keyboard unpowered. The quotes are part of the kernel
+# parameter: without them the space splits it and Windows 2022 stays claimed.
+# See install/hardware/n1x.sh.
+KERNEL_CMDLINE[default]+=" acpi_osi=\"!Windows 2022\""
 CONF
 fi
 
@@ -127,11 +129,15 @@ if [[ -z $root_cmdline || $root_cmdline != *root=* ]]; then
   echo "Error: /etc/kernel/cmdline has no root= (Limine defaults not written yet)" >&2
   return 1
 fi
-rescue_cmdline="$root_cmdline initramfs_async=0 console=tty0 acpi=nospcr plymouth.enable=0 nomodeset module_blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm,nvidia_peermem,nouveau modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm,nvidia_peermem,nouveau nvidia_drm.modeset=0 systemd.unit=multi-user.target fbcon=map:0 loglevel=7 ignore_loglevel systemd.show_status=1 systemd.log_target=console vt.global_cursor_default=1${lenovo_osi}"
+rescue_cmdline="$root_cmdline initramfs_async=0 console=tty0 acpi=nospcr plymouth.enable=0 nomodeset module_blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm,nvidia_peermem,nouveau modprobe.blacklist=nvidia,nvidia_drm,nvidia_modeset,nvidia_uvm,nvidia_peermem,nouveau nvidia_drm.modeset=0 systemd.unit=multi-user.target fbcon=map:0 loglevel=7 ignore_loglevel systemd.show_status=1 systemd.log_target=console vt.global_cursor_default=1"
+if (( lenovo_n1x )); then
+  rescue_cmdline+=' acpi_osi="!Windows 2022"'
+fi
+rescue_cmdline_escaped=${rescue_cmdline//\"/\\\"}
 printf '%s\n' \
   '# N1x: a text-console rescue entry sits right below the normal one; see install/hardware/n1x.sh.' \
   'MKINITCPIO_FALLBACK=linux-omarchy' \
-  "KERNEL_CMDLINE[fallback]=\"$rescue_cmdline\"" \
+  "KERNEL_CMDLINE[fallback]=\"$rescue_cmdline_escaped\"" \
   'EXCLUDE_SNAPSHOT_ENTRIES="Windows*, windows*, *fallback"' \
   'BOOT_ORDER="linux-omarchy, linux-omarchy-fallback, *, Snapshots"' \
   > /etc/limine-entry-tool.d/zz-omarchy-n1x-boot-order.conf

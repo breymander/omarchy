@@ -13,12 +13,12 @@ rebuild_marker="${OMARCHY_LIMINE_REBUILD_MARKER:-/var/lib/omarchy/migrations/179
 
 sudo install -Dm644 /dev/stdin "$dropin" <<'EOF'
 # Lenovo N1x: firmware hides SSPM from an OS that claims Windows 2022, which
-# leaves the I2C keyboard unpowered. See install/hardware/n1x.sh.
-KERNEL_CMDLINE[default]+=" acpi_osi=!Windows 2022"
+# leaves the I2C keyboard unpowered. Quotes keep Windows 2022 one parameter.
+KERNEL_CMDLINE[default]+=" acpi_osi=\"!Windows 2022\""
 EOF
 
-if [[ -f $boot_order ]] && ! grep -Fq 'acpi_osi=!Windows 2022' "$boot_order"; then
-  sudo sed -i 's/vt.global_cursor_default=1"/vt.global_cursor_default=1 acpi_osi=!Windows 2022"/' "$boot_order"
+if [[ -f $boot_order ]] && ! grep -Fq 'acpi_osi=\"!Windows 2022\"' "$boot_order"; then
+  printf '%s\n' 'KERNEL_CMDLINE[fallback]+=" acpi_osi=\"!Windows 2022\""' | sudo tee -a "$boot_order" >/dev/null
 fi
 
 # Machine-wide rebuild. Another user's run must not repeat it; a missing
