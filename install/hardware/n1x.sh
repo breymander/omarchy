@@ -55,10 +55,10 @@ if omarchy-hw-match "15N1X11" || omarchy-hw-match "83SS"; then
   lenovo_n1x=1
   cat > /etc/limine-entry-tool.d/00-omarchy-n1x-lenovo-osi.conf <<'CONF'
 # Lenovo N1x: firmware hides SSPM from an OS that claims Windows 2022, which
-# leaves the I2C keyboard unpowered. The quotes are part of the kernel
-# parameter: without them the space splits it and Windows 2022 stays claimed.
-# See install/hardware/n1x.sh.
-KERNEL_CMDLINE[default]+=" acpi_osi=\"!Windows 2022\""
+# leaves the I2C keyboard unpowered. The inner quotes reach the kernel as
+# written (limine-entry-tool strips only the outer pair and does not unescape
+# \"), and keep Windows 2022 one parameter. See install/hardware/n1x.sh.
+KERNEL_CMDLINE[default]+=" acpi_osi="!Windows 2022""
 CONF
 fi
 
@@ -133,11 +133,10 @@ rescue_cmdline="$root_cmdline initramfs_async=0 console=tty0 acpi=nospcr plymout
 if (( lenovo_n1x )); then
   rescue_cmdline+=' acpi_osi="!Windows 2022"'
 fi
-rescue_cmdline_escaped=${rescue_cmdline//\"/\\\"}
 printf '%s\n' \
   '# N1x: a text-console rescue entry sits right below the normal one; see install/hardware/n1x.sh.' \
   'MKINITCPIO_FALLBACK=linux-omarchy' \
-  "KERNEL_CMDLINE[fallback]=\"$rescue_cmdline_escaped\"" \
+  "KERNEL_CMDLINE[fallback]=\"$rescue_cmdline\"" \
   'EXCLUDE_SNAPSHOT_ENTRIES="Windows*, windows*, *fallback"' \
   'BOOT_ORDER="linux-omarchy, linux-omarchy-fallback, *, Snapshots"' \
   > /etc/limine-entry-tool.d/zz-omarchy-n1x-boot-order.conf
