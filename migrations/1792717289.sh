@@ -6,10 +6,10 @@ echo "Unhide SSPM on the Lenovo Pro 9 15N1X11 so the internal keyboard powers on
 omarchy-hw-aarch64-n1x || exit 0
 omarchy-hw-match "15N1X11" || omarchy-hw-match "83SS" || exit 0
 
-limine_conf_dir="${OMARCHY_LIMINE_ENTRY_TOOL_DIR:-/etc/limine-entry-tool.d}"
+limine_conf_dir="/etc/limine-entry-tool.d"
 dropin="$limine_conf_dir/00-omarchy-n1x-lenovo-osi.conf"
 boot_order="$limine_conf_dir/zz-omarchy-n1x-boot-order.conf"
-rebuild_marker="${OMARCHY_LIMINE_REBUILD_MARKER:-/var/lib/omarchy/migrations/1792717289}"
+rebuild_marker="/var/lib/omarchy/migrations/1792717289"
 
 sudo install -Dm644 /dev/stdin "$dropin" <<'EOF'
 # Lenovo N1x: firmware hides SSPM from an OS that claims Windows 2022, which
@@ -23,11 +23,19 @@ if [[ -f $boot_order ]] && ! grep -Fq 'acpi_osi="!Windows 2022"' "$boot_order"; 
 fi
 
 # Machine-wide rebuild. Another user's run must not repeat it; a missing
-# marker still retries an interrupted rebuild. limine-mkinitcpio can skip a
-# kernel it could not build and still exit 0, so the marker is written only
-# after a boot entry actually carries the parameter.
+# marker still retries an interrupted rebuild.
 [[ ! -e $rebuild_marker ]] || exit 0
-sudo limine-mkinitcpio || exit 1
+rebuild_log=$(mktemp)
+trap 'rm -f "$rebuild_log"' EXIT
+sudo limine-mkinitcpio 2>&1 | tee "$rebuild_log"
+
+# limine-mkinitcpio reports a kernel it could not rebuild and still exits 0.
+# Leave the migration pending even if another entry carries the parameter
+# or the built menu cannot be read.
+if grep -q 'mkinitcpio failed for kernel' "$rebuild_log"; then
+  echo "A boot image was not rebuilt. Fix the error above, then run omarchy-migrate again before rebooting." >&2
+  exit 1
+fi
 
 param='acpi_osi=!Windows 2022'
 carries_param() {
@@ -49,14 +57,11 @@ carries_param() {
   [[ $last == $param ]]
 }
 
-limine_conf="${OMARCHY_LIMINE_CONF:-}"
-if [[ -z $limine_conf ]]; then
-  esp=""
-  if [[ -r /etc/default/limine ]]; then
-    esp=$(sed -n 's/^ESP_PATH=["'\'']\?\([^"'\'']*\).*/\1/p' /etc/default/limine | tail -n 1)
-  fi
-  limine_conf="${esp:-/boot}/limine.conf"
+esp=""
+if [[ -r /etc/default/limine ]]; then
+  esp=$(sed -n 's/^ESP_PATH=["'\'']\?\([^"'\'']*\).*/\1/p' /etc/default/limine | tail -n 1)
 fi
+limine_conf="${esp:-/boot}/limine.conf"
 
 built=0
 menu_cmdlines=$(sudo grep -E '^[[:space:]]*cmdline:' "$limine_conf" 2>/dev/null) || menu_cmdlines=""
