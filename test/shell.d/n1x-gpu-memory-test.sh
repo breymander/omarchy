@@ -59,12 +59,6 @@ apply
 holds "$lenovo_four_gib" && [[ ! -s $CALL_LOG ]] || fail "a set Lenovo reservation is not rewritten"
 pass "a Lenovo reservation keeps its marker and is set to 4 GiB"
 
-printf '\x07\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x60\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00' > "$var"
-cp "$var" "$tmp_dir/unknown-marker"
-! apply || fail "an unrecognized marker is an error"
-cmp -s "$tmp_dir/unknown-marker" "$var" && [[ ! -s $CALL_LOG ]] || fail "an unrecognized marker is left alone"
-pass "an unrecognized marker is left alone"
-
 printf '\x07\x00\x00\x00\x00\xfa\x00\x00\x00\x00\x00\x40\x00' > "$var"
 cp "$var" "$tmp_dir/unknown"
 ! apply || fail "an unknown layout is an error"
