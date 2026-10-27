@@ -13,17 +13,18 @@ set -euo pipefail
 # EXPOSED_DISP_FRM is the variable NVIDIA and the OEMs agreed on for sizing it,
 # so every N1x firmware has it. It takes effect at the next boot.
 #
-# The reservation in MiB is the first four bytes (0xFA00 as the XPS 16 ships
-# it, 0x8000 as the Lenovo ships it, 0x1000 for 4 GiB here) and the last byte
-# has the firmware apply it. The 16 bytes between are an OEM marker, 0x20 on
-# the XPS 16 and 0x40 on the Lenovo. Both are the layout NVIDIA described;
-# an unrecognized marker is left alone. The GPU firmware itself has been seen
-# using 80 MiB of the reservation with the XPS 16's own panel and 230 MiB with
-# a 5120x2160@120 monitor, and drawing a 5K display up to about 700 MiB below
-# the top of it, so 4 GiB leaves it room.
+# NVIDIA's value for it: the reservation in MiB in the first four bytes (0xFA00
+# as the XPS 16 ships it, 0x8000 as the Lenovo ships it; 0x1000, 4 GiB, here)
+# and a last byte that has the firmware apply it. NVIDIA gave us the 16 bytes
+# between as the XPS 16 ships them; the Lenovo ships 0x40 where the XPS 16 has
+# 0x20, and boots with 4 GiB with its own byte kept. So the bytes between stay
+# as shipped, and any other value is left alone. The GPU firmware itself has
+# been seen using 80 MiB of the reservation with the XPS 16's own panel and
+# 230 MiB with a 5120x2160@120 monitor, and drawing a 5K display up to about
+# 700 MiB below the top of it, so 4 GiB leaves it room.
 
 var="${OMARCHY_EFIVARS:-/sys/firmware/efi/efivars}/EXPOSED_DISP_FRM-4b086294-0740-4f71-a7b5-85a329c7ec5f"
-# Known markers between the size and the apply byte.
+# What the firmware ships between the size and the last byte.
 layouts=(
   "00 00 00 20 00 00 00 00 00 00 00 00 01 00 00 00"
   "00 00 00 40 00 00 00 00 00 00 00 00 01 00 00 00"
@@ -36,6 +37,7 @@ if [[ ! -f $var ]]; then
   exit 1
 fi
 
+# An efivarfs file is the variable's 4 attribute bytes followed by its data.
 read -r -a bytes <<<"$(od -An -v -tx1 "$var" | tr '\n' ' ')"
 
 matched=""
